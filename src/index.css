@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/geist-mono/400.css";
+@import "@fontsource/jura/400.css";
+@import "tw-animate-css";
+
+@theme {
+  /* ── Backgrounds (pulled from logo dark bg + cube tones) ── */
+  --color-basalt-bg:       #0A0B13;
+  --color-basalt-surface:  #0E0F1A;
+  --color-basalt-elevated: #13141F;
+  --color-basalt-overlay:  #191A2A;
+
+  /* ── Borders ── */
+  --color-basalt-border-subtle:  #1E1F32;
+  --color-basalt-border-default: #282940;
+  --color-basalt-border-strong:  #3A3B58;
+
+  /* ── Text ── */
+  --color-basalt-text-primary:   #E8EAFF;
+  --color-basalt-text-secondary: #8890BB;
+  --color-basalt-text-muted:     #484A6E;
+  --color-basalt-text-code:      #A5B4FC;
+
+  /* ── Accents (logo violet + supporting palette) ── */
+  --color-basalt-accent-violet: #7C4FD4;
+  --color-basalt-accent-blue:   #4F7EE8;
+  --color-basalt-accent-green:  #10B981;
+  --color-basalt-accent-amber:  #F59E0B;
+  --color-basalt-accent-red:    #EF4444;
+
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: #0A0B13;
+    color: #F0F4FF;
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #253047;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334466;
+  }
+}
