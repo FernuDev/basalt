@@ -1,10 +1,3 @@
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct ConnectionConfig {
-    pub id: String,
-    pub name: String,
-    pub uri: String,
-}
-
 #[derive(Debug, serde::Serialize)]
 pub struct TableMeta {
     pub name: String,

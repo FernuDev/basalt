@@ -30,6 +30,7 @@ import type { Connection, TableMeta } from "../../lib/types";
 interface SidebarProps {
   connections: Connection[];
   tables: TableMeta[];
+  tablesLoading?: boolean;
   activeConnectionId: string | null;
   activeTable: string | null;
   onSelectConnection: (id: string) => void;
@@ -49,6 +50,7 @@ interface CtxMenuState {
 export function Sidebar({
   connections,
   tables,
+  tablesLoading = false,
   activeConnectionId,
   activeTable,
   onSelectConnection,
@@ -277,7 +279,7 @@ export function Sidebar({
               className="text-[10px] font-semibold tracking-widest uppercase font-sans"
               style={{ color: "#E8EAFF" }}
             >
-              Tables
+              {activeConn?.type === "mongodb" ? "Databases" : "Tables"}
             </span>
             {activeConn && (
               <span
@@ -306,14 +308,32 @@ export function Sidebar({
 
           {tablesOpen && (
             <div className="overflow-y-auto flex-1">
-              {tables.length === 0 && activeConn && (
+              {/* Skeleton while loading */}
+              {tablesLoading && (
+                <div className="px-3 py-2 flex flex-col gap-1.5">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-6 rounded"
+                      style={{
+                        background: "linear-gradient(90deg, #13141F 0%, #1E1F32 50%, #13141F 100%)",
+                        backgroundSize: "200% 100%",
+                        animation: `skeletonShimmer 1.4s ease-in-out ${i * 0.07}s infinite`,
+                        width: `${68 + (i % 3) * 12}%`,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!tablesLoading && tables.length === 0 && activeConn && (
                 <p className="text-[11px] font-sans px-4 py-2 text-basalt-text-muted">
                   No tables found
                 </p>
               )}
 
               {/* Grouped by schema */}
-              {schemas.map((schema) => {
+              {!tablesLoading && schemas.map((schema) => {
                 const schemaTables = schemaMap.get(schema)!;
                 const open = isSchemaOpen(schema);
                 return (

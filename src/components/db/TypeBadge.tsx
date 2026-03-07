@@ -1,6 +1,7 @@
 import { cn } from "../../lib/utils";
 
 const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  // ── PostgreSQL types ─────────────────────────────────────────────────────
   INT:       { bg: "rgba(59,130,246,0.15)",  text: "#A5B4FC" },
   INT2:      { bg: "rgba(59,130,246,0.15)",  text: "#A5B4FC" },
   INT4:      { bg: "rgba(59,130,246,0.15)",  text: "#A5B4FC" },
@@ -23,6 +24,18 @@ const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   FLOAT8:    { bg: "rgba(20,184,166,0.15)",  text: "#5EEAD4" },
   NUMERIC:   { bg: "rgba(20,184,166,0.15)",  text: "#5EEAD4" },
   DECIMAL:   { bg: "rgba(20,184,166,0.15)",  text: "#5EEAD4" },
+  // ── BSON / MongoDB types ─────────────────────────────────────────────────
+  OBJECTID:    { bg: "rgba(251,146,60,0.15)",  text: "#FB923C" },
+  STRING:      { bg: "rgba(16,185,129,0.15)",  text: "#6EE7B7" },
+  INT32:       { bg: "rgba(59,130,246,0.15)",  text: "#A5B4FC" },
+  INT64:       { bg: "rgba(59,130,246,0.15)",  text: "#A5B4FC" },
+  DOUBLE:      { bg: "rgba(20,184,166,0.15)",  text: "#5EEAD4" },
+  DECIMAL128:  { bg: "rgba(20,184,166,0.15)",  text: "#5EEAD4" },
+  NULL:        { bg: "rgba(68,85,102,0.2)",     text: "#484A6E" },
+  ARRAY:       { bg: "rgba(20,184,166,0.15)",  text: "#2DD4BF" },
+  OBJECT:      { bg: "rgba(232,78,198,0.15)",  text: "#F0ABFC" },
+  BINARY:      { bg: "rgba(68,85,102,0.2)",    text: "#94A3B8" },
+  UNKNOWN:     { bg: "rgba(68,85,102,0.2)",    text: "#484A6E" },
 };
 
 export function TypeBadge({ type, className }: { type: string; className?: string }) {

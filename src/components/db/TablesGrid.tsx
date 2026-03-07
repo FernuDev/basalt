@@ -13,11 +13,14 @@ interface TablesGridProps {
   tables: TableMeta[];
   activeConnection: Connection | null;
   onOpenTable: (name: string) => void;
+  loading?: boolean;
 }
 
-export function TablesGrid({ tables, activeConnection, onOpenTable }: TablesGridProps) {
+export function TablesGrid({ tables, activeConnection, onOpenTable, loading = false }: TablesGridProps) {
   const [hoveredTable, setHoveredTable] = useState<string | null>(null);
   const [openSchemas, setOpenSchemas] = useState<Record<string, boolean>>({});
+
+  const isMongo = activeConnection?.type === "mongodb";
 
   const accentColor = activeConnection?.color ?? "#7C4FD4";
 
@@ -63,7 +66,7 @@ export function TablesGrid({ tables, activeConnection, onOpenTable }: TablesGrid
       >
         <div>
           <h1 className="text-sm font-semibold font-sans" style={{ color: "#E8EAFF" }}>
-            Tables
+            {isMongo ? "Collections" : "Tables"}
           </h1>
           <p className="text-xs font-mono mt-0.5" style={{ color: "#484A6E" }}>
             {activeConnection.name}
@@ -75,27 +78,94 @@ export function TablesGrid({ tables, activeConnection, onOpenTable }: TablesGrid
             className="font-mono text-xs px-2 py-1 rounded"
             style={{ background: `${accentColor}20`, color: accentColor }}
           >
-            {tables.length} tables
+            {tables.length} {isMongo ? "collections" : "tables"}
           </span>
           <span
             className="font-mono text-xs px-2 py-1 rounded"
             style={{ background: "#13141F", color: "#484A6E", border: "1px solid #1E1F32" }}
           >
-            {schemas.length} schemas
+            {schemas.length} {isMongo ? "databases" : "schemas"}
           </span>
         </div>
       </div>
 
       {/* Schemas + tables */}
       <div className="flex-1 overflow-auto p-5 flex flex-col gap-6">
-        {tables.length === 0 ? (
+        {/* Skeleton grid while loading */}
+        {loading && (
+          <>
+            {/* Skeleton schema header */}
+            <div className="flex flex-col gap-4">
+              {[8, 6].map((count, gi) => (
+                <div key={gi} className="flex flex-col gap-3">
+                  <div
+                    className="h-8 rounded-lg w-40"
+                    style={{
+                      background: "linear-gradient(90deg, #13141F 0%, #1E1F32 50%, #13141F 100%)",
+                      backgroundSize: "200% 100%",
+                      animation: "skeletonShimmer 1.4s ease-in-out infinite",
+                    }}
+                  />
+                  <div
+                    className="grid gap-3"
+                    style={{ gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))" }}
+                  >
+                    {Array.from({ length: count }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="rounded-xl p-4 flex flex-col gap-2"
+                        style={{
+                          background: "#13141F",
+                          border: "1px solid #1E1F32",
+                          animationDelay: `${i * 0.05}s`,
+                        }}
+                      >
+                        {/* Icon placeholder */}
+                        <div
+                          className="w-9 h-9 rounded-lg mb-1"
+                          style={{
+                            background: "linear-gradient(90deg, #1E1F32 0%, #282940 50%, #1E1F32 100%)",
+                            backgroundSize: "200% 100%",
+                            animation: `skeletonShimmer 1.4s ease-in-out ${i * 0.06}s infinite`,
+                          }}
+                        />
+                        {/* Name placeholder */}
+                        <div
+                          className="h-3.5 rounded"
+                          style={{
+                            width: `${55 + (i % 4) * 10}%`,
+                            background: "linear-gradient(90deg, #1E1F32 0%, #282940 50%, #1E1F32 100%)",
+                            backgroundSize: "200% 100%",
+                            animation: `skeletonShimmer 1.4s ease-in-out ${i * 0.06 + 0.1}s infinite`,
+                          }}
+                        />
+                        {/* Row count placeholder */}
+                        <div
+                          className="h-2.5 rounded"
+                          style={{
+                            width: "40%",
+                            background: "linear-gradient(90deg, #1E1F32 0%, #282940 50%, #1E1F32 100%)",
+                            backgroundSize: "200% 100%",
+                            animation: `skeletonShimmer 1.4s ease-in-out ${i * 0.06 + 0.2}s infinite`,
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {!loading && tables.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <Table2 className="w-10 h-10" style={{ color: "#282940" }} />
             <p className="text-sm font-sans" style={{ color: "#484A6E" }}>
               No tables in this database
             </p>
           </div>
-        ) : (
+        ) : !loading && (
           schemas.map((schema) => {
             const schemaTables = schemaMap.get(schema)!;
             const open = isSchemaOpen(schema);

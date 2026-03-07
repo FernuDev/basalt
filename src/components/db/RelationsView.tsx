@@ -32,15 +32,16 @@ export function RelationsView({ connection }: RelationsViewProps) {
   const [activeRelIdx, setActiveRelIdx] = useState<number | null>(null);
 
   const accentColor = connection?.color ?? "#4F7EE8";
+  const isMongo = connection?.type === "mongodb";
   const canvasRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!connection || connection.status !== "connected") return;
+    if (!connection || connection.status !== "connected" || isMongo) return;
     loadForeignKeys();
   }, [connection?.id]);
 
   const loadForeignKeys = async () => {
-    if (!connection) return;
+    if (!connection || isMongo) return;
     setLoading(true);
     try {
       const keys = await db.getForeignKeys(connection.id);
@@ -51,6 +52,35 @@ export function RelationsView({ connection }: RelationsViewProps) {
       setLoading(false);
     }
   };
+
+  // MongoDB empty state
+  if (isMongo) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 relative">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: "linear-gradient(rgba(30,31,50,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(30,31,50,0.6) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+        <div
+          className="relative z-10 w-12 h-12 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}
+        >
+          <GitBranch className="w-5 h-5" style={{ color: "#10B981" }} />
+        </div>
+        <div className="relative z-10 text-center">
+          <p className="text-sm font-sans font-medium" style={{ color: "#8890BB" }}>
+            Relations not supported for MongoDB
+          </p>
+          <p className="text-xs font-sans mt-1 max-w-xs" style={{ color: "#484A6E" }}>
+            MongoDB does not have native foreign keys. Use the Query Editor to explore document references manually.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Build unique table list from FKs
   const tables = Array.from(

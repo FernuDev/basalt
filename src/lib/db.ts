@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ColumnDef, ForeignKey, QueryResult, TableMeta } from "./types";
 
+// ── PostgreSQL ────────────────────────────────────────────────────────────────
 export const db = {
   connect: (id: string, uri: string): Promise<string> =>
     invoke("pg_connect", { id, uri }),
@@ -27,4 +28,43 @@ export const db = {
 
   getForeignKeys: (id: string): Promise<ForeignKey[]> =>
     invoke("pg_get_foreign_keys", { id }),
+};
+
+// ── MongoDB ───────────────────────────────────────────────────────────────────
+export const mongo = {
+  connect: (id: string, uri: string): Promise<string> =>
+    invoke("mg_connect", { id, uri }),
+
+  disconnect: (id: string): Promise<void> =>
+    invoke("mg_disconnect", { id }),
+
+  listCollections: (id: string): Promise<TableMeta[]> =>
+    invoke("mg_list_collections", { id }),
+
+  getCollectionSchema: (id: string, collection: string): Promise<ColumnDef[]> =>
+    invoke("mg_get_collection_schema", { id, collection }),
+
+  getCollectionData: (
+    id: string,
+    collection: string,
+    limit = 100,
+    offset = 0
+  ): Promise<QueryResult> =>
+    invoke("mg_get_collection_data", { id, collection, limit, offset }),
+
+  executeQuery: (
+    id: string,
+    collection: string,
+    filterJson: string,
+    operation: "find" | "count" | "aggregate"
+  ): Promise<QueryResult> =>
+    invoke("mg_execute_query", { id, collection, filterJson: filterJson, operation }),
+
+  updateDocument: (
+    id: string,
+    collection: string,
+    docId: string,
+    updatesJson: string
+  ): Promise<void> =>
+    invoke("mg_update_document", { id, collection, docId, updatesJson }),
 };

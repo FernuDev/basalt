@@ -3,6 +3,7 @@ import { TablesGrid } from "./TablesGrid";
 import { TableDetail } from "./TableDetail";
 import { RelationsView } from "./RelationsView";
 import { QueryEditor } from "./QueryEditor";
+import { ErrorBoundary } from "../ErrorBoundary";
 import type { Connection, TableMeta } from "../../lib/types";
 
 export type NavTab = "tables" | "relations" | "query";
@@ -11,10 +12,12 @@ interface MainContentProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   activeTable: string | null;
+  activeTabId: string | null;
   onOpenTable: (name: string) => void;
-  onCloseTable: () => void;
+  onCloseTab: (id: string) => void;
   connection: Connection | null;
   tables: TableMeta[];
+  tablesLoading?: boolean;
 }
 
 const NAV_TABS: { id: NavTab; label: string; icon: React.ReactNode }[] = [
@@ -27,10 +30,12 @@ export function MainContent({
   activeTab,
   onTabChange,
   activeTable,
+  activeTabId,
   onOpenTable,
-  onCloseTable,
+  onCloseTab,
   connection,
   tables,
+  tablesLoading = false,
 }: MainContentProps) {
   const table = tables.find((t) => t.name === activeTable);
   const accentColor = connection?.color ?? "#4F7EE8";
@@ -71,37 +76,48 @@ export function MainContent({
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === "tables" && !activeTable && (
-          <TablesGrid
-            tables={tables}
-            activeConnection={connection}
-            onOpenTable={onOpenTable}
-          />
-        )}
+        <ErrorBoundary label="Content area">
+          {activeTab === "tables" && (() => {
+            // While fetching tables for a new connection, show skeleton grid
+            if (tablesLoading) {
+              return (
+                <TablesGrid
+                  tables={[]}
+                  activeConnection={connection}
+                  onOpenTable={onOpenTable}
+                  loading={true}
+                />
+              );
+            }
+            // A table tab is selected and the table is found in the current list
+            if (activeTable && table) {
+              return (
+                <TableDetail
+                  table={table}
+                  connection={connection}
+                  onBack={() => activeTabId && onCloseTab(activeTabId)}
+                />
+              );
+            }
+            // No active table tab → show the tables overview grid
+            return (
+              <TablesGrid
+                tables={tables}
+                activeConnection={connection}
+                onOpenTable={onOpenTable}
+                loading={false}
+              />
+            );
+          })()}
 
-        {activeTab === "tables" && activeTable && table && (
-          <TableDetail
-            table={table}
-            connection={connection}
-            onBack={onCloseTable}
-          />
-        )}
+          {activeTab === "relations" && (
+            <RelationsView connection={connection} />
+          )}
 
-        {activeTab === "tables" && activeTable && !table && (
-          <TablesGrid
-            tables={tables}
-            activeConnection={connection}
-            onOpenTable={onOpenTable}
-          />
-        )}
-
-        {activeTab === "relations" && (
-          <RelationsView connection={connection} />
-        )}
-
-        {activeTab === "query" && (
-          <QueryEditor connection={connection} />
-        )}
+          {activeTab === "query" && (
+            <QueryEditor connection={connection} tables={tables} />
+          )}
+        </ErrorBoundary>
       </div>
     </div>
   );

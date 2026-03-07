@@ -26,4 +26,9 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "json"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+mongodb = "3"
+bson = { version = "2", features = ["chrono-0_4"] }
+indexmap = "2"
+hex = "0.4"
+futures = "0.3"
 

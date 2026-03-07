@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Key, Link2, Loader2, Save, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { db } from "../../lib/db";
+import { db, mongo } from "../../lib/db";
 import type { ColumnDef } from "../../lib/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -68,8 +68,9 @@ interface RowEditPanelProps {
   open: boolean;
   row: unknown[];
   columns: ColumnDef[];
-  tableName: string;      // "schema.table"
+  tableName: string;      // "schema.table" or "database.collection"
   connectionId: string;
+  isMongo?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -82,6 +83,7 @@ export function RowEditPanel({
   columns,
   tableName,
   connectionId,
+  isMongo = false,
   onClose,
   onSaved,
 }: RowEditPanelProps) {
@@ -98,11 +100,12 @@ export function RowEditPanel({
       init[col.name] = row[i] ?? null;
     });
     setValues(init);
-    loadFkOptions(init);
+    // FK smart selects are only for PostgreSQL
+    if (!isMongo) loadFkOptions(init);
   }, [open, row, columns]);
 
   const loadFkOptions = useCallback(
-    async (currentValues: Record<string, unknown>) => {
+    async (_currentValues: Record<string, unknown>) => {
       const fkCols = columns.filter((c) => c.foreign_key);
       if (fkCols.length === 0) return;
       setLoadingFk(true);
@@ -151,6 +154,34 @@ export function RowEditPanel({
       return;
     }
 
+    setSaving(true);
+
+    if (isMongo) {
+      // MongoDB path: build a JSON patch object from non-_id fields
+      const updates: Record<string, unknown> = {};
+      columns
+        .filter((c) => !c.is_primary_key)
+        .forEach((c) => { updates[c.name] = values[c.name] ?? null; });
+
+      try {
+        await mongo.updateDocument(
+          connectionId,
+          tableName,
+          String(values[pkCol.name] ?? ""),
+          JSON.stringify(updates)
+        );
+        toast.success("Document updated successfully.");
+        onSaved();
+        onClose();
+      } catch (err) {
+        toast.error(`Update failed: ${err}`);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // PostgreSQL path
     const parts = tableName.split(".");
     const schema = parts[0];
     const table = parts[1] ?? parts[0];
@@ -162,12 +193,12 @@ export function RowEditPanel({
 
     if (!setClauses) {
       toast.error("Nothing to update.");
+      setSaving(false);
       return;
     }
 
     const sql = `UPDATE "${schema}"."${table}" SET ${setClauses} WHERE "${pkCol.name}" = ${pgLiteral(values[pkCol.name])} RETURNING *`;
 
-    setSaving(true);
     try {
       await db.executeQuery(connectionId, sql);
       toast.success("Row updated successfully.");

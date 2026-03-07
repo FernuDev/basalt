@@ -114,11 +114,15 @@ export function DataTable({
     onPageChange?.(newPage, limit);
   };
 
-  const getColName = (col: ColumnDef | string): string =>
-    typeof col === "string" ? col : col.name;
+  const getColName = (col: ColumnDef | string | undefined): string => {
+    if (!col) return "";
+    return typeof col === "string" ? col : col.name;
+  };
 
-  const getColDef = (col: ColumnDef | string): ColumnDef | null =>
-    typeof col === "string" ? null : col;
+  const getColDef = (col: ColumnDef | string | undefined): ColumnDef | null => {
+    if (!col || typeof col === "string") return null;
+    return col;
+  };
 
   const exportCsv = () => {
     const header = columns.map(getColName).join(",");
@@ -215,9 +219,8 @@ export function DataTable({
           </thead>
           <tbody>
             {rows.map((row, ri) => {
-              const colDefs = columns.every((c) => typeof c !== "string")
-                ? (columns as ColumnDef[])
-                : null;
+              const allDefs = columns.length > 0 && columns.every((c) => typeof c !== "string");
+              const colDefs = allDefs ? (columns as ColumnDef[]) : null;
               return (
                 <tr
                   key={ri}
@@ -236,11 +239,14 @@ export function DataTable({
                     (e.currentTarget as HTMLTableRowElement).style.background = "transparent";
                   }}
                 >
-                  {row.map((cell, ci) => (
-                    <td key={ci} style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
-                      <CellValue colName={getColName(columns[ci])} value={cell} />
-                    </td>
-                  ))}
+                  {row.map((cell, ci) => {
+                    const col = columns[ci];
+                    return (
+                      <td key={ci} style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                        <CellValue colName={getColName(col)} value={cell} />
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}

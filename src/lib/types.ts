@@ -1,5 +1,5 @@
 export type ConnectionStatus = "connected" | "idle" | "connecting" | "error";
-export type ConnectionType = "postgres";
+export type ConnectionType = "postgres" | "mongodb";
 
 export interface Connection {
   id: string;

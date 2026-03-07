@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Play,
   AlignLeft,
@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable } from "./DataTable";
+import { MongoQueryEditor } from "./MongoQueryEditor";
 import { SAMPLE_QUERY } from "../../lib/types";
 import { db } from "../../lib/db";
-import type { Connection, QueryResult } from "../../lib/types";
+import type { Connection, QueryResult, TableMeta } from "../../lib/types";
 
 // ── Syntax tokens ─────────────────────────────────────────────────────────────
 const KW_CLAUSE =
@@ -167,9 +168,16 @@ type RunStatus = "idle" | "running" | "success" | "error";
 
 interface QueryEditorProps {
   connection: Connection | null;
+  tables?: TableMeta[];
 }
 
-export function QueryEditor({ connection }: QueryEditorProps) {
+export function QueryEditor({ connection, tables = [] }: QueryEditorProps) {
+  // Delegate to MongoDB editor when appropriate
+  if (connection?.type === "mongodb") {
+    return <MongoQueryEditor connection={connection} tables={tables} />;
+  }
+
+
   const [query, setQuery] = useState(SAMPLE_QUERY);
   const [runStatus, setRunStatus] = useState<RunStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -182,7 +190,6 @@ export function QueryEditor({ connection }: QueryEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const lineNumRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLPreElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
   const lines = query.split("\n");
