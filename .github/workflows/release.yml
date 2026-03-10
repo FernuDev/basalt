@@ -32,6 +32,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -53,7 +58,7 @@ jobs:
             patchelf
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Build and upload to release
         uses: tauri-apps/tauri-action@v0
