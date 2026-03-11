@@ -1,6 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ColumnDef, ForeignKey, QueryResult, TableMeta } from "./types";
 
+// ── File utilities ────────────────────────────────────────────────────────────
+export const files = {
+  /** Write CSV text to the given absolute path. */
+  saveCsv: (path: string, content: string): Promise<void> =>
+    invoke("save_csv", { path, content }),
+};
+
 // ── PostgreSQL ────────────────────────────────────────────────────────────────
 export const db = {
   connect: (id: string, uri: string): Promise<string> =>

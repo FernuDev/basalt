@@ -30,6 +30,7 @@ fn sanitize_identifier(name: &str) -> String {
 }
 
 fn serialize_row(row: &sqlx::postgres::PgRow) -> Result<Vec<serde_json::Value>, String> {
+    use bigdecimal::BigDecimal;
     use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 
     let cols = row.columns();
@@ -41,12 +42,61 @@ fn serialize_row(row: &sqlx::postgres::PgRow) -> Result<Vec<serde_json::Value>, 
         let val = if raw.is_null() {
             serde_json::Value::Null
         } else {
-            match raw.type_info().name() {
+            let type_name = raw.type_info().name().to_string();
+            match type_name.as_str() {
                 "INT2" | "INT4" => json!(row.try_get::<i32, _>(i).unwrap_or(0)),
                 "INT8" => json!(row.try_get::<i64, _>(i).unwrap_or(0)),
                 "FLOAT4" => json!(row.try_get::<f32, _>(i).map(|v| v as f64).unwrap_or(0.0)),
                 "FLOAT8" => json!(row.try_get::<f64, _>(i).unwrap_or(0.0)),
                 "BOOL" => json!(row.try_get::<bool, _>(i).unwrap_or(false)),
+
+                // NUMERIC / DECIMAL — binary wire format, must use BigDecimal
+                "NUMERIC" | "DECIMAL" => json!(
+                    row.try_get::<BigDecimal, _>(i)
+                        .map(|d| d.to_string())
+                        .unwrap_or_default()
+                ),
+
+                // MONEY — PostgreSQL stores as int64 cents; try String first (text mode),
+                // then fall back to raw int64 arithmetic.
+                "MONEY" => {
+                    if let Ok(s) = row.try_get::<String, _>(i) {
+                        json!(s)
+                    } else if let Ok(cents) = row.try_get::<i64, _>(i) {
+                        let sign = if cents < 0 { "-" } else { "" };
+                        let abs = cents.unsigned_abs();
+                        json!(format!("{sign}{}.{:02}", abs / 100, abs % 100))
+                    } else {
+                        json!(null)
+                    }
+                }
+
+                // INTERVAL — binary: (months i32, days i32, microseconds i64)
+                "INTERVAL" => {
+                    use sqlx::postgres::types::PgInterval;
+                    match row.try_get::<PgInterval, _>(i) {
+                        Ok(iv) => {
+                            let mut parts = Vec::new();
+                            if iv.months != 0 { parts.push(format!("{} months", iv.months)); }
+                            if iv.days   != 0 { parts.push(format!("{} days",   iv.days));   }
+                            if iv.microseconds != 0 {
+                                let total_us = iv.microseconds.abs();
+                                let h  = total_us / 3_600_000_000;
+                                let m  = (total_us % 3_600_000_000) / 60_000_000;
+                                let s  = (total_us % 60_000_000) / 1_000_000;
+                                let us = total_us % 1_000_000;
+                                let sign = if iv.microseconds < 0 { "-" } else { "" };
+                                if us > 0 {
+                                    parts.push(format!("{sign}{h:02}:{m:02}:{s:02}.{us:06}"));
+                                } else {
+                                    parts.push(format!("{sign}{h:02}:{m:02}:{s:02}"));
+                                }
+                            }
+                            if parts.is_empty() { json!("00:00:00") } else { json!(parts.join(" ")) }
+                        }
+                        Err(_) => json!(null),
+                    }
+                }
 
                 // UUID must be decoded as uuid::Uuid, not as String
                 "UUID" => json!(
@@ -55,29 +105,29 @@ fn serialize_row(row: &sqlx::postgres::PgRow) -> Result<Vec<serde_json::Value>, 
                         .unwrap_or_default()
                 ),
 
-                // Temporal types require chrono, not raw String decode
+                // Temporal types require chrono
                 "TIMESTAMPTZ" => json!(
                     row.try_get::<DateTime<Utc>, _>(i)
-                        .map(|t: DateTime<Utc>| t.to_rfc3339())
+                        .map(|t| t.to_rfc3339())
                         .unwrap_or_default()
                 ),
                 "TIMESTAMP" => json!(
                     row.try_get::<NaiveDateTime, _>(i)
-                        .map(|t: NaiveDateTime| t.to_string())
+                        .map(|t| t.to_string())
                         .unwrap_or_default()
                 ),
                 "DATE" => json!(
                     row.try_get::<NaiveDate, _>(i)
-                        .map(|d: NaiveDate| d.to_string())
+                        .map(|d| d.to_string())
                         .unwrap_or_default()
                 ),
                 "TIME" | "TIMETZ" => json!(
                     row.try_get::<NaiveTime, _>(i)
-                        .map(|t: NaiveTime| t.to_string())
+                        .map(|t| t.to_string())
                         .unwrap_or_default()
                 ),
 
-                // JSONB/JSON: decode as serde_json::Value directly
+                // JSONB/JSON
                 "JSONB" | "JSON" => row
                     .try_get::<serde_json::Value, _>(i)
                     .unwrap_or(serde_json::Value::Null),
@@ -89,11 +139,32 @@ fn serialize_row(row: &sqlx::postgres::PgRow) -> Result<Vec<serde_json::Value>, 
                     json!(format!("\\x{hex}"))
                 }
 
-                // TEXT, VARCHAR, CHAR, BPCHAR, NUMERIC, DECIMAL, INTERVAL, INET, CIDR, etc.
-                other => match row.try_get::<String, _>(i) {
-                    Ok(s) => json!(s),
-                    Err(_) => json!(format!("[{other}]")),
-                },
+                // TEXT, VARCHAR, CHAR, BPCHAR, NAME, INET, CIDR, MACADDR,
+                // user-defined ENUM types, domains — all sent as UTF-8 text.
+                // Array types (start with '_') are shown as a placeholder.
+                other => {
+                    if other.starts_with('_') {
+                        // PostgreSQL array type — show element type hint
+                        json!(format!("[{}[]]", &other[1..]))
+                    } else if let Ok(s) = row.try_get::<String, _>(i) {
+                        // Covers enums, domains, TEXT, VARCHAR, INET, etc.
+                        json!(s)
+                    } else {
+                        // Last resort: read raw bytes (text-format types only)
+                        let raw2 = row
+                            .try_get_raw(i)
+                            .map_err(|e| format!("column {i} raw error: {e}"))?;
+                        if let Ok(bytes) = raw2.as_bytes() {
+                            if let Ok(s) = std::str::from_utf8(bytes) {
+                                json!(s)
+                            } else {
+                                json!(format!("[{other}]"))
+                            }
+                        } else {
+                            json!(format!("[{other}]"))
+                        }
+                    }
+                }
             }
         };
         values.push(val);
@@ -438,4 +509,10 @@ pub async fn pg_get_foreign_keys(
         .collect();
 
     Ok(keys)
+}
+
+/// Write CSV content to the given absolute path (chosen via native save dialog).
+#[tauri::command]
+pub async fn save_csv(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content.as_bytes()).map_err(|e| format!("Write failed: {e}"))
 }

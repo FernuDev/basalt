@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, Key, Link2, Loader2, Save, RotateCcw } from "lucide-react";
+import { X, Key, Link2, Loader2, Save, RotateCcw, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { db, mongo } from "../../lib/db";
 import type { ColumnDef } from "../../lib/types";
@@ -91,6 +91,8 @@ export function RowEditPanel({
   const [fkOptions, setFkOptions] = useState<Record<string, FkOption[]>>({});
   const [loadingFk, setLoadingFk] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Initialise form values when the panel opens
   useEffect(() => {
@@ -215,6 +217,41 @@ export function RowEditPanel({
     const init: Record<string, unknown> = {};
     columns.forEach((col, i) => { init[col.name] = row[i] ?? null; });
     setValues(init);
+  };
+
+  const handleDelete = async () => {
+    const pkCol = columns.find((c) => c.is_primary_key);
+    if (!pkCol) {
+      toast.error("Cannot delete: no primary key found for this table.");
+      return;
+    }
+
+    setDeleting(true);
+
+    if (isMongo) {
+      toast.error("Document deletion is not yet supported for MongoDB connections.");
+      setDeleting(false);
+      setConfirmDelete(false);
+      return;
+    }
+
+    // PostgreSQL: DELETE WHERE pk = value
+    const parts = tableName.split(".");
+    const schema = parts[0];
+    const table = parts[1] ?? parts[0];
+    const sql = `DELETE FROM "${schema}"."${table}" WHERE "${pkCol.name}" = ${pgLiteral(values[pkCol.name])}`;
+
+    try {
+      await db.executeQuery(connectionId, sql);
+      toast.success("Row deleted successfully.");
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(`Delete failed: ${err}`);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   };
 
   if (!open) return null;
@@ -431,21 +468,100 @@ export function RowEditPanel({
           })}
         </div>
 
+        {/* Delete confirmation banner */}
+        {confirmDelete && (
+          <div
+            className="mx-5 mb-0 mt-2 rounded-lg p-3 flex flex-col gap-3 flex-shrink-0"
+            style={{
+              background: "rgba(239,68,68,0.08)",
+              border: "1px solid rgba(239,68,68,0.3)",
+            }}
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#EF4444" }} />
+              <div>
+                <p className="text-xs font-semibold font-sans" style={{ color: "#EF4444" }}>
+                  Delete this record?
+                </p>
+                <p className="text-[11px] font-sans mt-0.5" style={{ color: "#8890BB" }}>
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="px-3 py-1.5 text-xs font-sans rounded-md cursor-pointer"
+                style={{ color: "#484A6E", border: "1px solid #1E1F32" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded-md cursor-pointer disabled:opacity-50 transition-all"
+                style={{
+                  background: "#EF4444",
+                  color: "white",
+                  boxShadow: deleting ? "none" : "0 0 10px rgba(239,68,68,0.3)",
+                }}
+              >
+                {deleting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                {deleting ? "Deleting…" : "Yes, delete"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div
           className="flex items-center justify-between px-5 py-4 flex-shrink-0"
           style={{ borderTop: "1px solid #1E1F32" }}
         >
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-sans cursor-pointer transition-colors"
-            style={{ color: "#484A6E", border: "1px solid #1E1F32" }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#8890BB"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#484A6E"; }}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-sans cursor-pointer transition-colors"
+              style={{ color: "#484A6E", border: "1px solid #1E1F32" }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "#8890BB"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "#484A6E"; }}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset
+            </button>
+
+            {!isMongo && (
+              <button
+                onClick={() => setConfirmDelete((v) => !v)}
+                disabled={saving || deleting}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-sans cursor-pointer transition-all disabled:opacity-40"
+                style={{
+                  color: confirmDelete ? "#EF4444" : "#484A6E",
+                  border: confirmDelete ? "1px solid rgba(239,68,68,0.4)" : "1px solid #1E1F32",
+                  background: confirmDelete ? "rgba(239,68,68,0.08)" : "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  if (!confirmDelete) {
+                    e.currentTarget.style.color = "#EF4444";
+                    e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!confirmDelete) {
+                    e.currentTarget.style.color = "#484A6E";
+                    e.currentTarget.style.borderColor = "#1E1F32";
+                  }
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <button
@@ -457,7 +573,7 @@ export function RowEditPanel({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || confirmDelete}
               className="flex items-center gap-2 px-4 py-2 text-sm font-sans font-semibold rounded-md cursor-pointer disabled:opacity-50 transition-all"
               style={{
                 background: "linear-gradient(135deg, #7C4FD4, #9D6FE8)",

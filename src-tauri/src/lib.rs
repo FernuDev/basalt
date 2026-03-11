@@ -6,7 +6,7 @@ mod types;
 
 use commands::{
     pg_connect, pg_describe_table, pg_disconnect, pg_execute_query, pg_get_foreign_keys,
-    pg_get_table_data, pg_list_tables,
+    pg_get_table_data, pg_list_tables, save_csv,
 };
 use db::DbState;
 use mongo::MongoState;
@@ -21,9 +21,12 @@ use tokio::sync::Mutex;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(DbState(Mutex::new(HashMap::new())))
         .manage(MongoState(Mutex::new(HashMap::new())))
         .invoke_handler(tauri::generate_handler![
+            // Utilities
+            save_csv,
             // PostgreSQL
             pg_connect,
             pg_disconnect,

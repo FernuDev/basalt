@@ -154,6 +154,8 @@ export function TableDetail({ table, connection, onBack }: TableDetailProps) {
                 columns={queryResult ? (columns.length > 0 ? columns : queryResult.columns) : []}
                 rows={queryResult?.rows ?? []}
                 totalRows={table.row_count}
+                tableName={table.name}
+                connectionName={connection?.name}
                 onPageChange={handlePageChange}
                 onEditRow={(row, cols) => { setEditRow(row); setEditCols(cols); }}
               />

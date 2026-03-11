@@ -3,7 +3,6 @@ import {
   Play,
   AlignLeft,
   Clock,
-  Download,
   XCircle,
   Database,
   Loader2,
@@ -144,23 +143,6 @@ function formatSQL(sql: string): string {
     .split("\n")
     .map((l) => l.trim())
     .join("\n");
-}
-
-// ── Export CSV ────────────────────────────────────────────────────────────────
-function exportCSV(columns: string[], rows: unknown[][]) {
-  const header = columns.join(",");
-  const body = rows
-    .map((r) =>
-      r.map((v) => (v === null ? "" : `"${String(v).replace(/"/g, '""')}"`)).join(",")
-    )
-    .join("\n");
-  const blob = new Blob([header + "\n" + body], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `query_result_${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -574,23 +556,6 @@ export function QueryEditor({ connection, tables = [] }: QueryEditorProps) {
                 >
                   {queryResult.execution_time_ms}ms
                 </span>
-                <div className="flex-1" />
-                <button
-                  onClick={() => exportCSV(queryResult.columns, queryResult.rows as unknown[][])}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-sans cursor-pointer transition-colors"
-                  style={{ color: "#484A6E", border: "1px solid #1E1F32" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "#8890BB";
-                    e.currentTarget.style.borderColor = "#282940";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "#484A6E";
-                    e.currentTarget.style.borderColor = "#1E1F32";
-                  }}
-                >
-                  <Download className="w-3 h-3" />
-                  Export CSV
-                </button>
               </>
             )}
 
@@ -686,6 +651,7 @@ export function QueryEditor({ connection, tables = [] }: QueryEditorProps) {
             totalRows={queryResult.row_count}
             queryTime={`${queryResult.execution_time_ms}ms`}
             connectionName={connection?.name}
+            tableName={`query_${connection?.name ?? "result"}`}
           />
         )}
 

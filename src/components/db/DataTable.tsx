@@ -8,9 +8,13 @@ import {
   Link2,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 import { TypeBadge } from "./TypeBadge";
+import { files } from "../../lib/db";
 import type { ColumnDef } from "../../lib/types";
 
 interface DataTableProps {
@@ -19,6 +23,7 @@ interface DataTableProps {
   totalRows?: number;
   queryTime?: string;
   connectionName?: string;
+  tableName?: string;
   onPageChange?: (page: number, limit: number) => void;
   onEditRow?: (row: unknown[], columns: ColumnDef[]) => void;
 }
@@ -91,6 +96,7 @@ export function DataTable({
   totalRows = 0,
   queryTime,
   connectionName,
+  tableName,
   onPageChange,
   onEditRow,
 }: DataTableProps) {
@@ -98,6 +104,7 @@ export function DataTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+  const [exporting, setExporting] = useState(false);
   const totalPages = Math.ceil(totalRows / limit) || 1;
 
   const handleSort = (idx: number) => {
@@ -124,16 +131,49 @@ export function DataTable({
     return col;
   };
 
-  const exportCsv = () => {
-    const header = columns.map(getColName).join(",");
-    const body = rows.map((row) => row.map((v) => JSON.stringify(v ?? "")).join(",")).join("\n");
-    const blob = new Blob([header + "\n" + body], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "export.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportCsv = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      // RFC 4180-compliant CSV
+      const csvCell = (v: unknown): string => {
+        if (v === null || v === undefined) return "";
+        const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+
+      const header = columns.map(getColName).map(csvCell).join(",");
+      const body = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+      const csv = "\uFEFF" + header + "\r\n" + body; // BOM for Excel compatibility
+
+      // Build a suggested filename
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const base = tableName
+        ? tableName.replace(/[^a-zA-Z0-9_.-]/g, "_")
+        : connectionName
+        ? `${connectionName}_export`
+        : "export";
+      const defaultFilename = `${base}_${dateStr}.csv`;
+
+      // Open native Save As dialog
+      const chosenPath = await save({
+        defaultPath: defaultFilename,
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      });
+
+      // User cancelled the dialog
+      if (!chosenPath) return;
+
+      await files.saveCsv(chosenPath, csv);
+      toast.success(`Exported to ${chosenPath}`);
+    } catch (err) {
+      toast.error(`Export failed: ${err}`);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -145,10 +185,16 @@ export function DataTable({
       >
         <button
           onClick={exportCsv}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-sans cursor-pointer"
+          disabled={exporting || rows.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-sans cursor-pointer disabled:opacity-40 transition-colors"
           style={{ color: "#8890BB", border: "1px solid #1E1F32" }}
+          onMouseEnter={(e) => { if (!exporting) e.currentTarget.style.color = "#E8EAFF"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#8890BB"; }}
         >
-          <Download className="w-3.5 h-3.5" /> Export CSV
+          {exporting
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <Download className="w-3.5 h-3.5" />}
+          {exporting ? "Exporting…" : "Export CSV"}
         </button>
       </div>
 
