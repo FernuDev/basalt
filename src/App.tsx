@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
+import { useAutoUpdater } from "./hooks/use-auto-updater";
+
 import { SplashScreen } from "./components/SplashScreen";
 import { Topbar } from "./components/db/Topbar";
 import { Sidebar } from "./components/db/Sidebar";
@@ -23,6 +25,8 @@ export interface OpenTab {
 }
 
 export default function App() {
+  useAutoUpdater();
+
   const [isLoading, setIsLoading] = useState(true);
   const [connections, setConnections] = useState<Connection[]>(
     storage.loadConnections
